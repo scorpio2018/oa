@@ -3,15 +3,16 @@
  */
 package com.thinkgem.jeesite.modules.oa.service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.activiti.engine.HistoryService;
-import org.activiti.engine.IdentityService;
-import org.activiti.engine.RepositoryService;
-import org.activiti.engine.RuntimeService;
-import org.activiti.engine.TaskService;
+import com.google.common.collect.Maps;
+import com.thinkgem.jeesite.common.persistence.Page;
+import com.thinkgem.jeesite.common.service.CrudService;
+import com.thinkgem.jeesite.common.utils.Collections3;
+import com.thinkgem.jeesite.common.utils.StringUtils;
+import com.thinkgem.jeesite.modules.act.service.ActTaskService;
+import com.thinkgem.jeesite.modules.act.utils.ActUtils;
+import com.thinkgem.jeesite.modules.oa.dao.LeaveDao;
+import com.thinkgem.jeesite.modules.oa.entity.Leave;
+import org.activiti.engine.*;
 import org.activiti.engine.history.HistoricProcessInstance;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
@@ -19,13 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.thinkgem.jeesite.common.persistence.Page;
-import com.thinkgem.jeesite.common.service.BaseService;
-import com.thinkgem.jeesite.common.utils.Collections3;
-import com.thinkgem.jeesite.common.utils.StringUtils;
-import com.thinkgem.jeesite.modules.act.utils.ActUtils;
-import com.thinkgem.jeesite.modules.oa.dao.LeaveDao;
-import com.thinkgem.jeesite.modules.oa.entity.Leave;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 请假Service
@@ -34,7 +31,7 @@ import com.thinkgem.jeesite.modules.oa.entity.Leave;
  */
 @Service
 @Transactional(readOnly = true)
-public class LeaveService extends BaseService {
+public class LeaveService extends CrudService<LeaveDao, Leave> {
 
 	@Autowired
 	private LeaveDao leaveDao;
@@ -48,6 +45,8 @@ public class LeaveService extends BaseService {
 	protected RepositoryService repositoryService;
 	@Autowired
 	private IdentityService identityService;
+	@Autowired
+	private ActTaskService actTaskService;
 
 	/**
 	 * 获取流程详细及工作流参数
@@ -66,41 +65,92 @@ public class LeaveService extends BaseService {
 		leave.setVariables(variables);
 		return leave;
 	}
-	
+
 	/**
 	 * 启动流程
-	 * @param entity
+	 * @param leave
+	 * @param variables
 	 */
 	@Transactional(readOnly = false)
 	public void save(Leave leave, Map<String, Object> variables) {
 		
 		// 保存业务数据
 		if (StringUtils.isBlank(leave.getId())){
+
+
+			// 用来设置启动流程的人员ID，引擎会自动把用户ID保存到activiti:initiator中
+			identityService.setAuthenticatedUserId(leave.getCurrentUser().getLoginName());
+
+			// 启动流程
+			String businessKey = leave.getId().toString();
+			variables.put("type", "leave");
+			variables.put("busId", businessKey);
+			ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(ActUtils.PD_LEAVE[0], ActUtils.PD_LEAVE[0] + ":" + businessKey, variables);
+			leave.setProcessInstance(processInstance);
+
+			// 更新流程实例ID
+//			leave.setProcessInstanceId(processInstance.getId());
+//			leaveDao.updateProcessInstanceId(leave);
+
 			leave.preInsert();
 			leaveDao.insert(leave);
+
+			logger.debug("start process of {key={}, bkey={}, pid={}, variables={}}", new Object[] {
+					ActUtils.PD_LEAVE[0], businessKey, processInstance.getId(), variables });
 		}else{
 			leave.preUpdate();
 			leaveDao.update(leave);
+
+			leave.getAct().setComment(("yes".equals(leave.getAct().getFlag())?"[重申] ":"[销毁] ")+leave.getAct().getComment());
+
+			// 完成流程任务
+			Map<String, Object> vars = Maps.newHashMap();
+			vars.put("reApply", "yes".equals(leave.getAct().getFlag())? true : false);
+			actTaskService.complete(leave.getAct().getTaskId(), leave.getAct().getProcInsId(), leave.getAct().getComment(), vars);
 		}
-		logger.debug("save entity: {}", leave);
-		
-		// 用来设置启动流程的人员ID，引擎会自动把用户ID保存到activiti:initiator中
-		identityService.setAuthenticatedUserId(leave.getCurrentUser().getLoginName());
-		
-		// 启动流程
-		String businessKey = leave.getId().toString();
-		variables.put("type", "leave");
-		variables.put("busId", businessKey);
-		ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(ActUtils.PD_LEAVE[0], businessKey, variables);
-		leave.setProcessInstance(processInstance);
-		
-		// 更新流程实例ID
-		leave.setProcessInstanceId(processInstance.getId());
-		leaveDao.updateProcessInstanceId(leave);
-		
-		logger.debug("start process of {key={}, bkey={}, pid={}, variables={}}", new Object[] { 
-				ActUtils.PD_LEAVE[0], businessKey, processInstance.getId(), variables });
-		
+	}
+
+	/**
+	 * 审核审批保存
+	 * @param leave
+	 */
+	@Transactional(readOnly = false)
+	public void auditSave(Leave leave) {
+
+		// 对不同环节的业务逻辑进行操作
+		String taskDefKey = leave.getAct().getTaskDefKey();
+		if ("reportBack".equals(taskDefKey)) {
+			taskService.complete(leave.getAct().getTaskId());
+			return;
+		}
+
+		// 设置意见
+		leave.getAct().setComment(("yes".equals(leave.getAct().getFlag())?"[同意] ":"[驳回] ")+leave.getAct().getComment());
+
+		leave.preUpdate();
+
+
+		// 提交流程任务
+		Map<String, Object> vars = Maps.newHashMap();
+
+		// 审核环节
+		if ("audit".equals(taskDefKey)){
+
+		} else if ("deptLeaderAudit".equals(taskDefKey)){
+			leave.setLeadText(leave.getAct().getComment());
+			dao.updateLeadText(leave);
+			vars.put("deptLeaderPass", "yes".equals(leave.getAct().getFlag())? true : false);
+
+		} else if ("hrAudit".equals(taskDefKey)){
+			leave.setHrText(leave.getAct().getComment());
+			dao.updateHrText(leave);
+			vars.put("hrPass", "yes".equals(leave.getAct().getFlag())? true : false);
+		} else{
+			//未知环节，直接返回
+			return;
+		}
+
+		actTaskService.complete(leave.getAct().getTaskId(), leave.getAct().getProcInsId(), leave.getAct().getComment(), vars);
 	}
 
 	/**
