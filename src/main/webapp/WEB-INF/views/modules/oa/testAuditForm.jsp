@@ -17,7 +17,7 @@
 					$("#messageBox").text("输入有误，请先更正。");
 					if (element.is(":checkbox")||element.is(":radio")||element.parent().is(".input-append")){
 						error.appendTo(element.parent().parent());
-					} else {
+					} else {test_audit.bpmntest_audit.bpmntest_audit.bpmntest_audit.bpmntest_audit.bpmn
 						error.insertAfter(element);
 					}
 				}

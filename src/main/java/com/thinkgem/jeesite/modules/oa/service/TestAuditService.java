@@ -3,20 +3,19 @@
  */
 package com.thinkgem.jeesite.modules.oa.service;
 
-import java.util.Map;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.google.common.collect.Maps;
 import com.thinkgem.jeesite.common.persistence.Page;
 import com.thinkgem.jeesite.common.service.CrudService;
 import com.thinkgem.jeesite.common.utils.StringUtils;
 import com.thinkgem.jeesite.modules.act.service.ActTaskService;
 import com.thinkgem.jeesite.modules.act.utils.ActUtils;
-import com.thinkgem.jeesite.modules.oa.entity.TestAudit;
 import com.thinkgem.jeesite.modules.oa.dao.TestAuditDao;
+import com.thinkgem.jeesite.modules.oa.entity.TestAudit;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 /**
  * 审批Service
@@ -24,7 +23,6 @@ import com.thinkgem.jeesite.modules.oa.dao.TestAuditDao;
  * @version 2014-05-16
  */
 @Service
-@Transactional(readOnly = true)
 public class TestAuditService extends CrudService<TestAuditDao, TestAudit> {
 
 	@Autowired
