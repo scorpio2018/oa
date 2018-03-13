@@ -3,27 +3,6 @@
  */
 package com.thinkgem.jeesite.modules.oa.web;
 
-import java.util.List;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
-import org.activiti.engine.RuntimeService;
-import org.activiti.engine.TaskService;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
 import com.google.common.collect.Maps;
 import com.thinkgem.jeesite.common.mapper.JsonMapper;
 import com.thinkgem.jeesite.common.persistence.Page;
@@ -31,6 +10,23 @@ import com.thinkgem.jeesite.common.web.BaseController;
 import com.thinkgem.jeesite.modules.oa.entity.Leave;
 import com.thinkgem.jeesite.modules.oa.service.LeaveService;
 import com.thinkgem.jeesite.modules.sys.utils.UserUtils;
+import org.activiti.engine.RuntimeService;
+import org.activiti.engine.TaskService;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 请假Controller
@@ -52,11 +48,33 @@ public class LeaveController extends BaseController {
 	@Autowired
 	protected TaskService taskService;
 
+	@ModelAttribute
+	public Leave get(@RequestParam(required=false) String id){
+		Leave leave = null;
+		if (StringUtils.isNotBlank(id)){
+			leave = leaveService.get(id);
+		}
+
+		if (leave == null){
+			leave = new Leave();
+		}
+
+		return leave;
+	}
+
 	@RequiresPermissions("oa:leave:view")
 	@RequestMapping(value = {"form"})
 	public String form(Leave leave, Model model) {
+		String taskDefKey = leave.getAct().getTaskDefKey();
+
+		String view = "leaveForm";
+		if("deptLeaderAudit".equals(taskDefKey)
+				|| "hrAudit".equals(taskDefKey)){
+			view = "leaveAudit";
+		}
+
 		model.addAttribute("leave", leave);
-		return "modules/oa/leaveForm";
+		return "modules/oa/" + view;
 	}
 
 	/**
@@ -74,12 +92,32 @@ public class LeaveController extends BaseController {
 			logger.error("启动请假流程失败：", e);
 			addMessage(redirectAttributes, "系统内部错误！");
 		}
-		return "redirect:" + adminPath + "/oa/leave/form";
+		return "redirect:" + adminPath + "/act/task/todo/";
+	}
+
+	/**
+	 * 工单执行（完成任务）
+	 * @param leave
+	 * @param model
+	 * @return
+	 */
+	@RequiresPermissions("oa:leave:edit")
+	@RequestMapping(value = "saveAudit")
+	public String saveAudit(Leave leave, Model model) {
+		if (StringUtils.isBlank(leave.getAct().getFlag())
+				|| StringUtils.isBlank(leave.getAct().getComment())){
+			addMessage(model, "请填写审核意见。");
+			return form(leave, model);
+		}
+		leaveService.auditSave(leave);
+		return "redirect:" + adminPath + "/act/task/todo/";
 	}
 
 	/**
 	 * 任务列表
-	 * @param leave	
+	 * @param session
+	 * @param model
+	 * @return
 	 */
 	@RequiresPermissions("oa:leave:view")
 	@RequestMapping(value = {"list/task",""})

@@ -123,5 +123,17 @@
 			del_flag = #{DEL_FLAG_DELETE}
 		WHERE id = #{id}
 	</update>
+
+	<update id="updateLeadText">
+		UPDATE oa_leave SET
+		lead_text = #{leadText}
+		WHERE id = #{id}
+	</update>
+
+	<update id="updateHrText">
+		UPDATE oa_leave SET
+		hr_text = #{hrText}
+		WHERE id = #{id}
+	</update>
 	
 </mapper>

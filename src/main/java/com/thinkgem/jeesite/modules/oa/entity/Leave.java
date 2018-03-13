@@ -3,22 +3,22 @@
  */
 package com.thinkgem.jeesite.modules.oa.entity;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.google.common.collect.Lists;
+import com.thinkgem.jeesite.common.persistence.DataEntity;
+import com.thinkgem.jeesite.common.utils.StringUtils;
+import com.thinkgem.jeesite.modules.act.entity.Act;
+import com.thinkgem.jeesite.modules.sys.entity.User;
+import com.thinkgem.jeesite.modules.sys.utils.DictUtils;
 import org.activiti.engine.history.HistoricProcessInstance;
 import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
 import org.hibernate.validator.constraints.Length;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.google.common.collect.Lists;
-import com.thinkgem.jeesite.common.persistence.DataEntity;
-import com.thinkgem.jeesite.common.utils.StringUtils;
-import com.thinkgem.jeesite.modules.sys.entity.User;
-import com.thinkgem.jeesite.modules.sys.utils.DictUtils;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 请假Entity
@@ -35,6 +35,8 @@ public class Leave extends DataEntity<Leave> {
 	private Date realityStartTime;	// 实际开始时间
 	private Date realityEndTime;	// 实际结束时间
 	private String leaveType;	// 假种
+	private String leadText;	//部门领导审批意见
+	private String hrText;		//人事部门审批意见
 	
 	private String ids;
 	private Date createDateStart;
@@ -42,6 +44,7 @@ public class Leave extends DataEntity<Leave> {
 
 	//-- 临时属性 --//
 	// 流程任务
+	private Act act;
 	private Task task;
 	private Map<String, Object> variables;
 	// 运行中的流程实例
@@ -204,7 +207,30 @@ public class Leave extends DataEntity<Leave> {
 	public void setCreateDateEnd(Date createDateEnd) {
 		this.createDateEnd = createDateEnd;
 	}
-	
+
+	public Act getAct() {
+		return act;
+	}
+
+	public void setAct(Act act) {
+		this.act = act;
+	}
+
+	public String getLeadText() {
+		return leadText;
+	}
+
+	public void setLeadText(String leadText) {
+		this.leadText = leadText;
+	}
+
+	public String getHrText() {
+		return hrText;
+	}
+
+	public void setHrText(String hrText) {
+		this.hrText = hrText;
+	}
 }
 
 

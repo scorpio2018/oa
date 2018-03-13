@@ -28,5 +28,19 @@ public interface LeaveDao extends CrudDao<Leave> {
 	 * @return
 	 */
 	public int updateRealityTime(Leave leave);
+
+	/**
+	 * 更新部门领导审批意见
+	 * @param leave
+	 * @return
+	 */
+	public int updateLeadText(Leave leave);
+
+	/**
+	 * 更新人事部门审批意见
+	 * @param leave
+	 * @return
+	 */
+	public int updateHrText(Leave leave);
 	
 }
